@@ -60,7 +60,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         // Add lookup properties
         
-        ModelMethod lookupFindMethod = new ModelMethod("public", "Class<?>", "findTranquileModel", "Class<?> entity", "    return classes.get(entity);");
+        ModelMethod lookupFindMethod = new ModelMethod("public", "Class<?>", "findTranquilModel", "Class<?> entity", "    return classes.get(entity);");
         lookupFindMethod.addAnnotation("@Override");
         
         baseLookup.addInterface("fi.tranquil.processing.EntityLookup");
