@@ -37,20 +37,26 @@ public class ClassWriter {
         else 
           printClassOpening(modelClass.getName(), modelClass.getInterfaces(), fileWriter);
         
-        printLn(fileWriter);
-        printOriginalPropertyNames(fileWriter, modelClass.getOriginalPropetyNames());
-        printLn(fileWriter);
+        for (ModelMethod method : modelClass.getMethods()) {
+          printLn(fileWriter);
+          printMethod(method, fileWriter);
+        }
         
         for (ModelPropety property : modelClass.getPropeties()) {
-          printLn(fileWriter);
-          printGetter(fileWriter, property.getName(), property.getType());
-          printLn(fileWriter);
-          printSetter(fileWriter, property.getName(), property.getType());
+          if (property.getAddGetter()) {
+            printLn(fileWriter);
+            printGetter(fileWriter, property.getName(), property.getType());
+          }
+
+          if (property.getAddSetter()) {
+            printLn(fileWriter);
+            printSetter(fileWriter, property.getName(), property.getType());
+          }
         }
     
         for (ModelPropety property : modelClass.getPropeties()) {
           printLn(fileWriter);
-          printField(fileWriter, property.getName(), property.getType());
+          printField(fileWriter, property.getModifiers(), property.getName(), property.getType(), property.getDefaultValue());
         }
     
         printClassClosing(fileWriter); 
@@ -118,54 +124,66 @@ public class ClassWriter {
     fileWriter.append("}\n");
   }
 
-  private void printOriginalPropertyNames(PrintWriter fileWriter, List<String> originalPropertyName) {
-    fileWriter.append("  public final static String[] properties = {");
-    
-    for (int i = 0, l = originalPropertyName.size(); i < l; i++) {
-      fileWriter
-        .append('"')
-        .append(originalPropertyName.get(i))
-        .append('"');
-
-      if (i < l - 1) {
-        fileWriter.append(',');
-      }
-    }
-    
-    fileWriter.append("};");
-  }
-
   private void printGetter(PrintWriter fileWriter, String propertyName, String propertyType) {
-    fileWriter.append("  public ")
-      .append(propertyType)
-      .append(" get")
-      .append(captitalize(propertyName))
-      .append("() {\n    return ")
-      .append(propertyName)
-      .append(";\n  }\n");
+    printMethod(new ModelMethod("public", propertyType, "get" + captitalize(propertyName), null, "    return " + propertyName + ";"), fileWriter);
   }
 
   private void printSetter(PrintWriter fileWriter, String propertyName, String propertyType) {
-    fileWriter.append("  public void set")
-      .append(captitalize(propertyName))
-      .append("(")
-      .append(propertyType)
-      .append(" ")
-      .append(propertyName)
-      .append(") {")
-      .append("\n    this.")
+    StringBuilder bodyBuilder = new StringBuilder();
+    bodyBuilder
+      .append("    this.")
       .append(propertyName)
       .append(" = ")
       .append(propertyName)
-      .append(";\n  }\n");
+      .append(";");
+    
+    printMethod(new ModelMethod("public", "void", "set" + captitalize(propertyName), propertyType + " " + propertyName, bodyBuilder.toString()), fileWriter);
   }
 
-  private void printField(PrintWriter fileWriter, String propertyName, String propertyType) {
-    fileWriter.append("  private ")
+  private void printMethod(ModelMethod method, PrintWriter fileWriter) {
+    for (String annotation : method.getAnnotations()) {
+      fileWriter
+        .append("  ")
+        .append(annotation)
+        .append('\n');
+    }
+
+    fileWriter.append("  ");
+    fileWriter.append(method.getModifiers());
+    fileWriter.append(' ');
+    if (method.getReturnType() != null) {
+      fileWriter.append(method.getReturnType());
+      fileWriter.append(' ');
+    }
+    
+    fileWriter
+      .append(method.getName())
+      .append("(");
+    
+    if (method.getParameters() != null) {
+      fileWriter.append(method.getParameters());
+    }
+    
+    fileWriter
+      .append(") {\n")
+      .append(method.getBody())
+      .append("\n  }\n");
+  }
+
+  private void printField(PrintWriter fileWriter, String modifiers, String propertyName, String propertyType, String defaultValue) {
+    fileWriter.append("  ")
+      .append(modifiers)
+      .append(" ")
       .append(propertyType)
       .append(" ")
-      .append(propertyName)
-      .append(";\n");
+      .append(propertyName);
+    
+    if (defaultValue != null) {
+      fileWriter.append(" = ");
+      fileWriter.append(defaultValue);
+    }
+
+    fileWriter.append(";\n");
   }
   
   private String captitalize(String string) {

@@ -25,7 +25,7 @@ public class ModelClass {
   public String getPackageName() {
     return packageName;
   }
-  
+
   public ModelClass getParentClass() {
     return parentClass;
   }
@@ -59,19 +59,39 @@ public class ModelClass {
   }
 
   public void addProperty(String type, String name) {
-    propeties.add(new ModelPropety(type, name));
+    addProperty("private", type, name, true, true);
+  }
+  
+  public void addProperty(String type, String name, String defaultValue) {
+    addProperty("private", type, name, defaultValue, true, true);
+  }
+
+  public void addProperty(String modifiers, String type, String name, boolean addGetter, boolean addSetter) {
+    addProperty(modifiers, type, name, null, addGetter, addSetter);
+  }
+
+  public void addProperty(String modifiers, String type, String name, String defaultValue, boolean addGetter, boolean addSetter) {
+    propeties.add(new ModelPropety(modifiers, type, name, defaultValue, addGetter, addSetter));
   }
   
   public List<ModelPropety> getPropeties() {
     return propeties;
   }
-
-  public List<String> getOriginalPropetyNames() {
-    return originalPropetyNames;
+  
+  public void addMethod(String modifiers, String returnType, String name, String parameters, String body) {
+    addMethod(new ModelMethod(modifiers, returnType, name, parameters, body));
   }
   
-  public void addOriginalPropertyName(String originalPropertyName) {
-    this.originalPropetyNames.add(originalPropertyName);
+  public void addMethod(ModelMethod method) {
+    this.methods.add(method);
+  }
+
+  public void addConstructor(String modifiers, String body, String parameters) {
+    this.addMethod(modifiers, null, getName(), parameters, body);
+  }
+
+  public List<ModelMethod> getMethods() {
+    return methods;
   }
 
   public String getFullyQualifiedName() {
@@ -91,6 +111,6 @@ public class ModelClass {
   private List<String> interfaces = new ArrayList<String>();
   
   private List<ModelPropety> propeties = new ArrayList<ModelPropety>();
-
-  private List<String> originalPropetyNames = new ArrayList<String>();
+  
+  private List<ModelMethod> methods = new ArrayList<ModelMethod>();
 }
