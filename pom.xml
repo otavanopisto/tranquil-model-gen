@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>fi.tranquil-model</groupId>
   <artifactId>tranquil-model-gen</artifactId>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>1.0.1</version>
   <packaging>jar</packaging>
   <name>Tranquil Model Generator</name>
   <description>Annotation Processor for generation tranquil model classes</description>
@@ -31,7 +31,7 @@
     <dependency>
       <groupId>fi.tranquil-model</groupId>
       <artifactId>tranquil-model</artifactId>
-      <version>1.0.1-SNAPSHOT</version>
+      <version>1.0.1</version>
     </dependency>
     <dependency>
       <groupId>org.hibernate.javax.persistence</groupId>
