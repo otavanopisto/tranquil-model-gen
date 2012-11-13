@@ -58,44 +58,63 @@ public class ModelClass {
     return interfaces;
   }
 
-  public void addProperty(String type, String name) {
-    addProperty("private", type, name, true, true);
+  public ModelProperty addProperty(String type, String name) {
+    return addProperty("private", type, name);
   }
   
-  public void addProperty(String type, String name, String defaultValue) {
-    addProperty("private", type, name, defaultValue, true, true);
+  public ModelProperty addProperty(String modifiers, String type, String name) {
+    return addProperty(modifiers, type, name, null);
   }
 
-  public void addProperty(String modifiers, String type, String name, boolean addGetter, boolean addSetter) {
-    addProperty(modifiers, type, name, null, addGetter, addSetter);
-  }
-
-  public void addProperty(String modifiers, String type, String name, String defaultValue, boolean addGetter, boolean addSetter) {
-    propeties.add(new ModelPropety(modifiers, type, name, defaultValue, addGetter, addSetter));
+  public ModelProperty addProperty(String modifiers, String type, String name, String defaultValue) {
+    ModelProperty modelPropety = new ModelProperty(modifiers, type, name, defaultValue);
+    properties.add(modelPropety);
+    return modelPropety;
   }
   
-  public List<ModelPropety> getPropeties() {
-    return propeties;
+  public List<ModelProperty> getProperties() {
+    return properties;
   }
   
-  public void addMethod(String modifiers, String returnType, String name, String parameters, String body) {
-    addMethod(new ModelMethod(modifiers, returnType, name, parameters, body));
+  public ModelMethod addMethod(String modifiers, String returnType, String name, String parameters, String body) {
+    return addMethod(new ModelMethod(modifiers, returnType, name, parameters, body));
   }
   
-  public void addMethod(ModelMethod method) {
+  public ModelMethod addMethod(ModelMethod method) {
     this.methods.add(method);
+    return method;
   }
 
-  public void addConstructor(String modifiers, String body, String parameters) {
-    this.addMethod(modifiers, null, getName(), parameters, body);
+  public ModelMethod addConstructor(String modifiers, String body, String parameters) {
+    return this.addMethod(modifiers, null, getName(), parameters, body);
   }
-
+  
+  public ModelMethod addGetter(ModelProperty property) {
+    return addMethod("public", property.getType(), "get" + captitalize(property.getName()), null, "    return " + property.getName() + ";");
+  }
+  
+  public ModelMethod addSetter(ModelProperty property) {
+    StringBuilder bodyBuilder = new StringBuilder();
+    bodyBuilder
+      .append("    this.")
+      .append(property.getName())
+      .append(" = ")
+      .append(property.getName())
+      .append(";");
+    
+    return addMethod("public", "void", "set" + captitalize(property.getName()), property.getType() + " " + property.getName(), bodyBuilder.toString());
+  }
+  
   public List<ModelMethod> getMethods() {
     return methods;
   }
 
   public String getFullyQualifiedName() {
     return getPackageName() + '.' + getName();
+  }
+  
+  private String captitalize(String string) {
+    return Character.toUpperCase(string.charAt(0)) + string.substring(1);
   }
   
   private String packageName;
@@ -110,7 +129,7 @@ public class ModelClass {
   
   private List<String> interfaces = new ArrayList<String>();
   
-  private List<ModelPropety> propeties = new ArrayList<ModelPropety>();
+  private List<ModelProperty> properties = new ArrayList<ModelProperty>();
   
   private List<ModelMethod> methods = new ArrayList<ModelMethod>();
 }

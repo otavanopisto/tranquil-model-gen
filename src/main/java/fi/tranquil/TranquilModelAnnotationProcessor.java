@@ -65,17 +65,17 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         baseLookup.addInterface("fi.tranquil.processing.EntityLookup");
         baseLookup.addConstructor("public", constructLookupConstructor(baseClasses), null);
-        baseLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()", false, false);
+        baseLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
         baseLookup.addMethod(lookupFindMethod);
         
         compactLookup.addInterface("fi.tranquil.processing.EntityLookup");
         compactLookup.addConstructor("public", constructLookupConstructor(compactClasses), null);
-        compactLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()", false, false);
+        compactLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
         compactLookup.addMethod(lookupFindMethod);
         
         completeLookup.addInterface("fi.tranquil.processing.EntityLookup");
         completeLookup.addConstructor("public", constructLookupConstructor(completeClasses), null);
-        completeLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()", false, false);
+        completeLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
         completeLookup.addMethod(lookupFindMethod);
         
         // Write lookup classes
@@ -145,7 +145,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
           TypeElement superInterfaceElement = (TypeElement) superInterfaceDeclaredType.asElement();
           classTree.addAll(resolveClassTree(superInterfaceElement));
         }
-      };
+      }
     } else if (typeElement.getKind() == ElementKind.CLASS) {
       TypeMirror superclassTypeMirror = typeElement.getSuperclass();
       while ((superclassTypeMirror != null) && (superclassTypeMirror.getKind() != TypeKind.NONE)) {
@@ -259,7 +259,9 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     for (Element element : baseProperties) {
       String propertyName =  getPropertyName(element);
       originalPropertiesBase.add(propertyName);
-      baseClass.addProperty(getPropertyTypeName(element), propertyName);
+      ModelProperty property = baseClass.addProperty(getPropertyTypeName(element), propertyName);
+      baseClass.addGetter(property);
+      baseClass.addSetter(property);
     }
     
     // And complex properties into compact and complete classes
@@ -271,14 +273,18 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       
       if (idType != null) {
         originalPropertiesCompact.add(propertyName);
-        compactClass.addProperty(idType, propertyName + "Id");
+        ModelProperty property = compactClass.addProperty(idType, propertyName + "Id");
+        compactClass.addGetter(property);
+        compactClass.addSetter(property);
       }
     }
 
     for (Element element : complexProperties) {
       String propertyName = getPropertyName(element);
       originalPropertiesComplete.add(propertyName);
-      completeClass.addProperty("fi.tranquil.TranquilModelEntity", propertyName);
+      ModelProperty property = completeClass.addProperty("fi.tranquil.TranquilModelEntity", propertyName);
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
     }
     
     // Add complex list properties into compact and complete classes
@@ -288,13 +294,17 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       DeclaredType listGenericType = (DeclaredType) getListGenericType((DeclaredType) getMethodReturnType(element));
       String idType = getIdTypeName(listGenericType.asElement());
       originalPropertiesCompact.add(propertyName);
-      compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "Ids");
+      ModelProperty property = compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "Ids");
+      compactClass.addGetter(property);
+      compactClass.addSetter(property);
     }
 
     for (Element element : complexListProperties) {
       String propertyName = getPropertyName(element);
       originalPropertiesComplete.add(propertyName);
-      completeClass.addProperty("java.util.List<fi.tranquil.TranquilModelEntity>", propertyName);
+      ModelProperty property = completeClass.addProperty("java.util.List<fi.tranquil.TranquilModelEntity>", propertyName);
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
     }
     
     // Add classes into lookup properties
@@ -307,9 +317,9 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     
     // Add original properties field into tranquil class
     
-    baseClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesBase) + "}", false, false);
-    compactClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesCompact) + "}", false, false);
-    completeClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesComplete) + "}", false, false);
+    baseClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesBase) + "}");
+    compactClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesCompact) + "}");
+    completeClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesComplete) + "}");
     
     // Write classes
     
