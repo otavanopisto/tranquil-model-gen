@@ -13,6 +13,7 @@ import java.util.Set;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
+import javax.annotation.processing.SupportedOptions;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
@@ -28,8 +29,9 @@ import javax.tools.Diagnostic.Kind;
 
 import org.apache.commons.lang3.StringUtils;
 
-@SupportedAnnotationTypes("*")
+@SupportedAnnotationTypes({ "fi.tranquil.TranquilEntity", "javax.persistence.Entity" })
 @SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedOptions("lookupPackage")
 public class TranquilModelAnnotationProcessor extends AbstractProcessor {
   
   private Collection<? extends TypeElement> typeElements;
@@ -48,9 +50,16 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         // TODO: Should user be able to rename these classes?
 
-        ModelClass baseLookup = new ModelClass("fi.tranquil", "BaseLookup");
-        ModelClass compactLookup = new ModelClass("fi.tranquil", "CompactLookup");
-        ModelClass completeLookup = new ModelClass("fi.tranquil", "CompleteLookup");
+        String lookupPackage = processingEnv.getOptions().get("lookupPackage");
+        String usePackage = "fi.tranquil"; 
+        if ((lookupPackage != null) && (!lookupPackage.isEmpty()))
+          usePackage = lookupPackage;
+        
+        processingEnv.getMessager().printMessage(Kind.NOTE, "TranquilModel using package " + usePackage);
+        
+        ModelClass baseLookup = new ModelClass(usePackage, "BaseLookup");
+        ModelClass compactLookup = new ModelClass(usePackage, "CompactLookup");
+        ModelClass completeLookup = new ModelClass(usePackage, "CompleteLookup");
         
         // Process entities
         
@@ -80,9 +89,9 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         // Write lookup classes
         
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile("fi.tranquil.BaseLookup"), baseLookup);
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile("fi.tranquil.CompactLookup"), compactLookup);
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile("fi.tranquil.CompleteLookup"), completeLookup);
+        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".BaseLookup"), baseLookup);
+        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompactLookup"), compactLookup);
+        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompleteLookup"), completeLookup);
       } catch (IOException e) {
         processingEnv.getMessager().printMessage(Kind.ERROR, e.getMessage());
       }
@@ -542,5 +551,5 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
   private ClassWriter classWriter = new ClassWriter();
   private Map<String, String> baseClasses;
   private Map<String, String> compactClasses;
-  private Map<String, String> completeClasses;   
+  private Map<String, String> completeClasses;
 }
