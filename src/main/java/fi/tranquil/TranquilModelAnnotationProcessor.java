@@ -282,7 +282,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       
       if (idType != null) {
         originalPropertiesCompact.add(propertyName);
-        ModelProperty property = compactClass.addProperty(idType, propertyName + "Id");
+        ModelProperty property = compactClass.addProperty(idType, propertyName + "_id");
         compactClass.addGetter(property);
         compactClass.addSetter(property);
       }
@@ -303,7 +303,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       DeclaredType listGenericType = (DeclaredType) getListGenericType((DeclaredType) getMethodReturnType(element));
       String idType = getIdTypeName(listGenericType.asElement());
       originalPropertiesCompact.add(propertyName);
-      ModelProperty property = compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "Ids");
+      ModelProperty property = compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "_ids");
       compactClass.addGetter(property);
       compactClass.addSetter(property);
     }
