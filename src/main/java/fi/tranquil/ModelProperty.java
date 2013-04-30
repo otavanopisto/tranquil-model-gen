@@ -1,5 +1,8 @@
 package fi.tranquil;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Property of {@link ModelClass}
  */
@@ -28,6 +31,15 @@ public class ModelProperty {
     return modifiers;
   }
 
+  public void addAnnotation(String annotation) {
+    annotations.add(annotation);
+  }
+  
+  public List<String> getAnnotations() {
+    return annotations;
+  }
+  
+  private List<String> annotations = new ArrayList<String>();
   private String modifiers;
   private String type;
   private String name;

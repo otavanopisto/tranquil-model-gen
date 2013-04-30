@@ -35,7 +35,8 @@ public class ModelClass {
   }
   
   public void addImport(String importString) {
-    this.imports.add(importString);
+    if (!imports.contains(importString))
+      this.imports.add(importString);
   }
   
   public List<String> getImports() {

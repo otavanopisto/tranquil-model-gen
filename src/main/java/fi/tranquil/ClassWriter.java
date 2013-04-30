@@ -44,7 +44,7 @@ public class ClassWriter {
 
         for (ModelProperty property : modelClass.getProperties()) {
           printLn(fileWriter);
-          printField(fileWriter, property.getModifiers(), property.getName(), property.getType(), property.getDefaultValue());
+          printField(property, fileWriter);
         }
     
         printClassClosing(fileWriter); 
@@ -142,15 +142,23 @@ public class ClassWriter {
       .append("\n  }\n");
   }
 
-  private void printField(PrintWriter fileWriter, String modifiers, String propertyName, String propertyType, String defaultValue) {
+  private void printField(ModelProperty property, PrintWriter fileWriter) {
+    for (String annotation : property.getAnnotations()) {
+      fileWriter
+        .append("  ")
+        .append(annotation)
+        .append('\n');
+    }
+
     fileWriter.append("  ")
-      .append(modifiers)
+      .append(property.getModifiers())
       .append(" ")
-      .append(propertyType)
+      .append(property.getType())
       .append(" ")
-      .append(propertyName);
+      .append(property.getName());
     
-    if (defaultValue != null) {
+    String defaultValue = property.getDefaultValue();
+    if (defaultValue  != null) {
       fileWriter.append(" = ");
       fileWriter.append(defaultValue);
     }

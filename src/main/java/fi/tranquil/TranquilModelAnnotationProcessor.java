@@ -22,12 +22,16 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 
 import org.apache.commons.lang3.StringUtils;
+
+import fi.tranquil.processing.TranquilityExpandedField;
 
 @SupportedAnnotationTypes({ "fi.tranquil.TranquilEntity", "javax.persistence.Entity" })
 @SupportedSourceVersion(SourceVersion.RELEASE_7)
@@ -223,6 +227,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     
     List<Element> baseProperties = new ArrayList<Element>();
     List<Element> complexProperties = new ArrayList<Element>();
+    List<Element> expandedProperties = new ArrayList<Element>();
     List<Element> complexListProperties = new ArrayList<Element>();
     
     Set<String> processedProperties = new HashSet<>();
@@ -258,7 +263,12 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
               
               processedProperties.add(propertyName);
             }
-          };
+          }
+        }
+        else if (element.getKind() == ElementKind.FIELD) {
+          if (element.getAnnotation(TranquilityEntityField.class) != null) {
+            expandedProperties.add(element);
+          }
         }
       }
     }
@@ -291,11 +301,40 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     for (Element element : complexProperties) {
       String propertyName = getPropertyName(element);
       originalPropertiesComplete.add(propertyName);
-      ModelProperty property = completeClass.addProperty("fi.tranquil.TranquilModelEntity", propertyName);
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
       completeClass.addGetter(property);
       completeClass.addSetter(property);
     }
     
+    for (Element element : expandedProperties) {
+      String propertyName = getPropertyName(element) + "_tq";
+      originalPropertiesComplete.add(propertyName);
+      
+      TranquilityEntityField annotation = element.getAnnotation(TranquilityEntityField.class);
+      if (!StringUtils.isEmpty(annotation.fieldName()))
+        propertyName = annotation.fieldName();
+      
+      TypeMirror mirror = null;
+      
+      try { 
+        annotation.value();
+      } catch (MirroredTypeException mte) {
+        mirror = mte.getTypeMirror();
+      }
+      
+      Types TypeUtils = this.processingEnv.getTypeUtils();
+      TypeElement e = (TypeElement) TypeUtils.asElement(mirror);
+
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      completeClass.addImport(TranquilityExpandedField.class.getCanonicalName());
+
+      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
+      property.addAnnotation("@TranquilityExpandedField(entityResolverClass = " + e.getQualifiedName() + ".class, idProperty = \"" + getPropertyName(element) + "\")");
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
+    }
+
     // Add complex list properties into compact and complete classes
     
     for (Element element : complexListProperties) {
@@ -311,7 +350,8 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     for (Element element : complexListProperties) {
       String propertyName = getPropertyName(element);
       originalPropertiesComplete.add(propertyName);
-      ModelProperty property = completeClass.addProperty("java.util.List<fi.tranquil.TranquilModelEntity>", propertyName);
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      ModelProperty property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
       completeClass.addGetter(property);
       completeClass.addSetter(property);
     }
