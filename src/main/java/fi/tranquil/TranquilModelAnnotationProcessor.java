@@ -329,7 +329,11 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
       completeClass.addImport(TranquilityExpandedField.class.getCanonicalName());
 
-      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
+      ModelProperty property;
+      if (isList(element.asType()))
+        property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
+      else
+        property = completeClass.addProperty("TranquilModelEntity", propertyName);
       property.addAnnotation("@TranquilityExpandedField(entityResolverClass = " + e.getQualifiedName() + ".class, idProperty = \"" + getPropertyName(element) + "\")");
       completeClass.addGetter(property);
       completeClass.addSetter(property);
