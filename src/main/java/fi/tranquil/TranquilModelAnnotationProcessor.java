@@ -196,6 +196,8 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     // Create classes
 
     String className = entity.getSimpleName().toString();
+    String qualifiedName = entity.getQualifiedName().toString();
+    
     String packageName = getPackage(entity);
     
     ModelClass baseClass = new ModelClass(packageName, className + "Base");
@@ -211,9 +213,9 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     
     // Add tranquil annotations to all three classes
 
-    baseClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.BASE)", className));
-    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", className));
-    completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", className));
+    baseClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.BASE)", qualifiedName));
+    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
+    completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", qualifiedName));
 
     List<String> originalPropertiesBase = new ArrayList<String>();
     List<String> originalPropertiesCompact = new ArrayList<String>();
