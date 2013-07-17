@@ -37,7 +37,7 @@ import fi.tranquil.processing.TranquilityExpandedField;
 @SupportedSourceVersion(SourceVersion.RELEASE_7)
 @SupportedOptions("lookupPackage")
 public class TranquilModelAnnotationProcessor extends AbstractProcessor {
-  
+
   private Collection<? extends TypeElement> typeElements;
   
   @Override
@@ -250,7 +250,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
               if (isEntity(methodReturnType)) {
                 complexProperties.add(element);
               } else {
-                if (isList(methodReturnType)) {
+                if (isCollection(methodReturnType)) {
                   TypeMirror listGenericType = getListGenericType((DeclaredType) methodReturnType);
 
                   if (listGenericType.getKind() == TypeKind.DECLARED && isEntity(((DeclaredType) listGenericType).asElement())) {
@@ -331,7 +331,11 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
       completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
       completeClass.addImport(TranquilityExpandedField.class.getCanonicalName());
 
-      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
+      ModelProperty property;
+      if (isCollection(element.asType()))
+        property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
+      else
+        property = completeClass.addProperty("TranquilModelEntity", propertyName);
       property.addAnnotation("@TranquilityExpandedField(entityResolverClass = " + e.getQualifiedName() + ".class, idProperty = \"" + getPropertyName(element) + "\")");
       completeClass.addGetter(property);
       completeClass.addSetter(property);
@@ -501,10 +505,10 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
   }
   
   /**
-   * Resolves a generic type of a java.util.List
+   * Resolves a generic type of a Collection
    * 
    * @param listType a list
-   * @return generic type of a java.util.List
+   * @return generic type of a Collection
    */
   private TypeMirror getListGenericType(DeclaredType listType) {
     List<? extends TypeMirror> typeArguments = listType.getTypeArguments();
@@ -544,32 +548,32 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
 
     return false;
   }
-  
+
   /**
-   * Returns whether type is java.util.List or not
+   * Returns whether type is java.util.Collection or not
    * 
    * @param type type
-   * @return whether type is java.util.List or not
+   * @return whether type is java.util.Collection or not
    */
-  private boolean isList(TypeMirror type) {
+  private boolean isCollection(TypeMirror type) {
     if (type.getKind() == TypeKind.DECLARED) {
-      return isList((TypeElement) ((DeclaredType) type).asElement());
+      return isCollection((TypeElement) ((DeclaredType) type).asElement());
     }
     
     return false;
   }
   
   /**
-   * Returns whether element is java.util.List or not
+   * Returns whether element is java.util.Collection or not
    * 
    * @param element element
-   * @return whether element is java.util.List or not
+   * @return whether element is java.util.Collection or not
    */
-  private boolean isList(TypeElement element) {
+  private boolean isCollection(TypeElement element) {
     String className = element.getQualifiedName().toString();
     try {
       Class<?> returnTypeClass = Class.forName(className);
-      if (returnTypeClass != null && returnTypeClass.isAssignableFrom(java.util.List.class)) {
+      if (returnTypeClass != null && java.util.Collection.class.isAssignableFrom(returnTypeClass)) {
         return true;
       }
     } catch (ClassNotFoundException e) {
