@@ -32,10 +32,20 @@ public class ClassWriter {
           printClassAnnotation(fileWriter, classAnnotation);
         }
         
-        if (modelClass.getParentClass() != null)
-          printClassOpening(modelClass.getName(), modelClass.getParentClass().getFullyQualifiedName(), modelClass.getInterfaces(), fileWriter);
-        else 
+        if (modelClass.getParentClass() != null) {
+        	String parentClassName = null;
+            	
+        	ModelClass parentClass = modelClass.getParentClass();
+        	if (modelClass.getPackageName().equals(parentClass.getPackageName())) {
+        		parentClassName = parentClass.getName();
+        	} else {
+        		parentClassName = parentClass.getFullyQualifiedName();
+        	}
+        	
+          printClassOpening(modelClass.getName(), parentClassName, modelClass.getInterfaces(), fileWriter);
+        } else {
           printClassOpening(modelClass.getName(), modelClass.getInterfaces(), fileWriter);
+        }
         
         for (ModelMethod method : modelClass.getMethods()) {
           printLn(fileWriter);
