@@ -27,7 +27,9 @@ import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Types;
+import javax.persistence.Transient;
 import javax.tools.Diagnostic.Kind;
+import javax.xml.bind.annotation.XmlTransient;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -242,10 +244,17 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         if (element.getKind() == ElementKind.METHOD) {
           String methodName = element.getSimpleName().toString();
           if (StringUtils.startsWith(methodName, "get")) {
+          	boolean skip = (element.getAnnotation(Transient.class) != null) || (element.getAnnotation(XmlTransient.class) != null);
             String propertyName = getPropertyName(element);
+            if (skip == false) {
+              Element fieldElement = findField(currentClass.getEnclosedElements(), propertyName);
+              if (fieldElement != null) {
+              	skip = (fieldElement.getAnnotation(Transient.class) != null) || (fieldElement.getAnnotation(XmlTransient.class) != null);
+              }
+            }
 
-            // TODO: Remove XMLTransient, JSONIgnore ?
-            if (!processedProperties.contains(propertyName)) {
+            // TODO: Skip JSONIgnore ?
+            if (!skip && !processedProperties.contains(propertyName)) {
               TypeMirror methodReturnType = getMethodReturnType(element);
               if (isEntity(methodReturnType)) {
                 complexProperties.add(element);
@@ -388,7 +397,19 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     classWriter.writeClass(processingEnv.getFiler().createSourceFile(processingEnv.getElementUtils().getBinaryName(entity) + "Complete"), completeClass);
   }
 
-  private String joinProperties(List<String> strings) {
+  private Element findField(List<? extends Element> elements, String name) {
+  	for (Element element : elements) {
+  		if (element.getKind() == ElementKind.FIELD) {
+  		  if (element.getSimpleName().contentEquals(name)) {
+  			  return element;
+  	  	}
+  		}
+  	}
+
+		return null;
+	}
+
+	private String joinProperties(List<String> strings) {
     StringBuilder resultBuilder = new StringBuilder();
     
     for (int i = 0, l = strings.size(); i < l; i++) {
