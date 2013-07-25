@@ -39,7 +39,7 @@ import fi.tranquil.processing.TranquilityExpandedField;
 @SupportedSourceVersion(SourceVersion.RELEASE_7)
 @SupportedOptions("lookupPackage")
 public class TranquilModelAnnotationProcessor extends AbstractProcessor {
-
+	
   private Collection<? extends TypeElement> typeElements;
   
   @Override
@@ -56,10 +56,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         // TODO: Should user be able to rename these classes?
 
-        String lookupPackage = processingEnv.getOptions().get("lookupPackage");
-        String usePackage = "fi.tranquil"; 
-        if ((lookupPackage != null) && (!lookupPackage.isEmpty()))
-          usePackage = lookupPackage;
+        String usePackage = getOption("lookupPackage");
         
         processingEnv.getMessager().printMessage(Kind.NOTE, "TranquilModel using package " + usePackage);
         
@@ -95,7 +92,10 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         // Write lookup classes
         
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".BaseLookup"), baseLookup);
+        if (!getBooleanOption("flatModel")) {
+          classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".BaseLookup"), baseLookup);
+        }
+        
         classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompactLookup"), compactLookup);
         classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompleteLookup"), completeLookup);
       } catch (IOException e) {
@@ -108,7 +108,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     return false;
   }
 
-  private String constructLookupConstructor(Map<String, String> classes) {
+	private String constructLookupConstructor(Map<String, String> classes) {
     StringBuilder bodyBuilder = new StringBuilder();
     boolean first = true;
 
@@ -178,6 +178,261 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     
     return classTree;
   }
+
+  private void writeClassesFlat(String packageName, String className, String qualifiedName, String binaryName, List<Element> baseProperties, List<Element> complexProperties, List<Element> expandedProperties, List<Element> complexListProperties) throws IOException {
+    ModelClass compactClass = new ModelClass(packageName, className + getOption("compactPostfix"));
+    ModelClass completeClass = new ModelClass(packageName, className + getOption("completePostfix"));
+    
+    // Add tranquil imports and TranquilModelEntity interface into all classes
+    
+    for (ModelClass modelClass : Arrays.asList(compactClass, completeClass)) {
+      modelClass.addImport("fi.tranquil.TranquilModel");
+      modelClass.addImport("fi.tranquil.TranquilModelType");
+      modelClass.addInterface("fi.tranquil.TranquilModelEntity");
+    }
+
+    // Add tranquil annotations to classes
+    
+    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
+    completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", qualifiedName));
+    
+    // Lists for original properties
+    
+    List<String> originalProperties = new ArrayList<String>();
+    resolveOriginalProperties(baseProperties, complexProperties, expandedProperties, complexListProperties, originalProperties, originalProperties);
+
+    // Add base properties into base class
+
+    addBaseProperties(compactClass, baseProperties);
+    addBaseProperties(completeClass, baseProperties);
+    
+    // And complex properties into compact and complete classes
+
+    addCompactComplexProperties(compactClass, complexProperties);
+    addCompleteComplexProperties(completeClass, complexProperties);
+    
+    // Add expanded properties into complete class
+    // TODO: Compact?
+    
+    addCompleteExpandedProperties(completeClass, expandedProperties);
+
+    // Add complex list properties into compact and complete classes
+
+    addCompactListProperties(compactClass, complexListProperties);
+    addCompleteListProperties(completeClass, complexListProperties);
+
+    // Add classes into lookup properties
+    
+    String fullyQualifiedClassName = packageName + '.' + className;
+
+    compactClasses.put(fullyQualifiedClassName, compactClass.getFullyQualifiedName());
+    completeClasses.put(fullyQualifiedClassName, completeClass.getFullyQualifiedName());
+    
+    // Add original properties field into tranquil class
+    
+    compactClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalProperties) + "}");
+    completeClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalProperties) + "}");
+    
+    // Write classes
+    
+    if (getBooleanOption("generateCompact")) {
+      note("Writing class: " + compactClass.getFullyQualifiedName());
+      classWriter.writeClass(processingEnv.getFiler().createSourceFile(binaryName + getOption("compactPostfix")), compactClass);
+    }
+
+    if (getBooleanOption("generateComplete")) {
+      note("Writing class: " + completeClass.getFullyQualifiedName());
+      classWriter.writeClass(processingEnv.getFiler().createSourceFile(binaryName + getOption("completePostfix")), completeClass);
+    }
+  }
+  
+  private void writeClasses(String packageName, String className, String qualifiedName, String binaryName, List<Element> baseProperties, List<Element> complexProperties, List<Element> expandedProperties, List<Element> complexListProperties) throws IOException {
+  	ModelClass baseClass = new ModelClass(packageName, className + getOption("basePostfix"));
+    ModelClass compactClass = new ModelClass(packageName, className + getOption("compactPostfix"), baseClass);
+    ModelClass completeClass = new ModelClass(packageName, className + getOption("completePostfix"), baseClass);
+    
+    // Add tranquil imports into all classes
+    
+    for (ModelClass modelClass : Arrays.asList(baseClass, compactClass, completeClass)) {
+      modelClass.addImport("fi.tranquil.TranquilModel");
+      modelClass.addImport("fi.tranquil.TranquilModelType");
+    }
+
+    // Add TranquilModelEntity interface into base class
+    
+    baseClass.addInterface("fi.tranquil.TranquilModelEntity");
+    
+    // Add tranquil annotations to all three classes
+
+    baseClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.BASE)", qualifiedName));
+    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
+    completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", qualifiedName));
+    
+    // Lists for original properties
+    
+    List<String> originalPropertiesBase = new ArrayList<String>();
+    List<String> originalPropertiesComplex = new ArrayList<String>();
+    resolveOriginalProperties(baseProperties, complexProperties, expandedProperties, complexListProperties, originalPropertiesBase, originalPropertiesComplex);
+    
+    // Add base properties into base class
+
+    addBaseProperties(baseClass, baseProperties);
+    
+    // And complex properties into compact and complete classes
+
+    addCompactComplexProperties(compactClass, complexProperties);
+    addCompleteComplexProperties(completeClass, complexProperties);
+    
+    // Add expanded properties into complete class
+    // TODO: Compact?
+    
+    addCompleteExpandedProperties(completeClass, expandedProperties);
+
+    // Add complex list properties into compact and complete classes
+
+    addCompactListProperties(compactClass, complexListProperties);
+    addCompleteListProperties(completeClass, complexListProperties);
+
+    // Add classes into lookup properties
+    
+    String fullyQualifiedClassName = packageName + '.' + className;
+
+    baseClasses.put(fullyQualifiedClassName, baseClass.getFullyQualifiedName());
+    compactClasses.put(fullyQualifiedClassName, compactClass.getFullyQualifiedName());
+    completeClasses.put(fullyQualifiedClassName, completeClass.getFullyQualifiedName());
+    
+    // Add original properties field into tranquil class
+    
+    baseClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesBase) + "}");
+    compactClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesComplex) + "}");
+    completeClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesComplex) + "}");
+    
+    // Write classes
+    
+    note("Writing class: " + baseClass.getFullyQualifiedName());
+    classWriter.writeClass(processingEnv.getFiler().createSourceFile(binaryName + getOption("basePostfix")), baseClass);
+   
+    if (getBooleanOption("generateCompact")) {
+      note("Writing class: " + compactClass.getFullyQualifiedName());
+      classWriter.writeClass(processingEnv.getFiler().createSourceFile(binaryName + getOption("compactPostfix")), compactClass);
+    }
+
+    if (getBooleanOption("generateComplete")) {
+      note("Writing class: " + completeClass.getFullyQualifiedName());
+      classWriter.writeClass(processingEnv.getFiler().createSourceFile(binaryName + getOption("completePostfix")), completeClass);
+    }
+  }
+
+  private void addBaseProperties(ModelClass baseClass, List<Element> baseProperties) {
+  	for (Element element : baseProperties) {
+      String propertyName =  getPropertyName(element);
+      ModelProperty property = baseClass.addProperty(getPropertyTypeName(element), propertyName);
+      baseClass.addGetter(property);
+      baseClass.addSetter(property);
+    }
+	}
+
+	private void addCompactComplexProperties(ModelClass compactClass, List<Element> complexProperties) {
+  	for (Element element : complexProperties) {
+      String propertyName = getPropertyName(element);
+      Element propertyType = getPropertyType(element);
+      String idType = getIdTypeName(propertyType);
+      
+      if (idType != null) {
+        ModelProperty property = compactClass.addProperty(idType, propertyName + "_id");
+        compactClass.addGetter(property);
+        compactClass.addSetter(property);
+      }
+    }
+  }
+
+  private void addCompleteComplexProperties(ModelClass completeClass, List<Element> complexProperties) {
+  	for (Element element : complexProperties) {
+      String propertyName = getPropertyName(element);
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
+    }
+  }
+  	
+  private void addCompleteExpandedProperties(ModelClass completeClass, List<Element> expandedProperties) {
+  	for (Element element : expandedProperties) {
+      String propertyName = getPropertyName(element) + "_tq";
+      
+      TranquilityEntityField annotation = element.getAnnotation(TranquilityEntityField.class);
+      if (!StringUtils.isEmpty(annotation.fieldName()))
+        propertyName = annotation.fieldName();
+      
+      TypeMirror mirror = null;
+      
+      try { 
+        annotation.value();
+      } catch (MirroredTypeException mte) {
+        mirror = mte.getTypeMirror();
+      }
+      
+      Types TypeUtils = this.processingEnv.getTypeUtils();
+      TypeElement e = (TypeElement) TypeUtils.asElement(mirror);
+
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      completeClass.addImport(TranquilityExpandedField.class.getCanonicalName());
+
+      ModelProperty property;
+      if (isCollection(element.asType()))
+        property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
+      else
+        property = completeClass.addProperty("TranquilModelEntity", propertyName);
+      
+      property.addAnnotation("@TranquilityExpandedField(entityResolverClass = " + e.getQualifiedName() + ".class, idProperty = \"" + getPropertyName(element) + "\")");
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
+    }
+  }
+  
+  private void addCompactListProperties(ModelClass compactClass, List<Element> complexListProperties) {
+  	for (Element element : complexListProperties) {
+      String propertyName = getPropertyName(element);
+      DeclaredType listGenericType = (DeclaredType) getListGenericType((DeclaredType) getMethodReturnType(element));
+      String idType = getIdTypeName(listGenericType.asElement());
+      ModelProperty property = compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "_ids");
+      compactClass.addGetter(property);
+      compactClass.addSetter(property);
+    }
+  }
+  
+  private void addCompleteListProperties(ModelClass completeClass, List<Element> complexListProperties) {
+  	for (Element element : complexListProperties) {
+      String propertyName = getPropertyName(element);
+      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
+      ModelProperty property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
+      completeClass.addGetter(property);
+      completeClass.addSetter(property);
+    }
+  }
+
+	private void resolveOriginalProperties(List<Element> baseProperties, List<Element> complexProperties, List<Element> expandedProperties,
+			List<Element> complexListProperties, List<String> originalPropertiesBase, List<String> originalPropertiesComplex) {
+		for (Element element : baseProperties) {
+      String propertyName =  getPropertyName(element);
+      originalPropertiesBase.add(propertyName);
+    }
+
+    for (Element element : complexProperties) {
+    	String propertyName = getPropertyName(element);
+      originalPropertiesComplex.add(propertyName);
+    }
+    
+    for (Element element : expandedProperties) {
+      String propertyName = getPropertyName(element) + "_tq";
+      originalPropertiesComplex.add(propertyName);
+    }
+    
+    for (Element element : complexListProperties) {
+      String propertyName = getPropertyName(element);
+      originalPropertiesComplex.add(propertyName);
+    }
+	}
   
   /**
    * Processes single entity
@@ -199,33 +454,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
 
     String className = entity.getSimpleName().toString();
     String qualifiedName = entity.getQualifiedName().toString();
-    
     String packageName = getPackage(entity);
-    
-    ModelClass baseClass = new ModelClass(packageName, className + "Base");
-    ModelClass compactClass = new ModelClass(packageName, className + "Compact", baseClass);
-    ModelClass completeClass = new ModelClass(packageName, className + "Complete", baseClass);
-    
-    // Add tranquil imports into all three classes
-    
-    for (ModelClass modelClass : Arrays.asList(baseClass, compactClass, completeClass)) {
-      modelClass.addImport("fi.tranquil.TranquilModel");
-      modelClass.addImport("fi.tranquil.TranquilModelType");
-    }
-    
-    // Add tranquil annotations to all three classes
-
-    baseClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.BASE)", qualifiedName));
-    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
-    completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", qualifiedName));
-
-    List<String> originalPropertiesBase = new ArrayList<String>();
-    List<String> originalPropertiesCompact = new ArrayList<String>();
-    List<String> originalPropertiesComplete = new ArrayList<String>();
-
-    // Add TranquilModelEntity interface into base class
-    
-    baseClass.addInterface("fi.tranquil.TranquilModelEntity");
 
     // Read properties from entity and split them in three categories: base properties, complex properties and complex list properties
     
@@ -283,121 +512,17 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         }
       }
     }
-    
-    // Add base properties into base class
 
-    for (Element element : baseProperties) {
-      String propertyName =  getPropertyName(element);
-      originalPropertiesBase.add(propertyName);
-      ModelProperty property = baseClass.addProperty(getPropertyTypeName(element), propertyName);
-      baseClass.addGetter(property);
-      baseClass.addSetter(property);
+    if (getBooleanOption("flatModel")) {
+      writeClassesFlat(packageName, className, qualifiedName, processingEnv.getElementUtils().getBinaryName(entity).toString(), 
+      		baseProperties, complexProperties, expandedProperties, complexListProperties);
+    } else {
+      writeClasses(packageName, className, qualifiedName, processingEnv.getElementUtils().getBinaryName(entity).toString(), 
+      		baseProperties, complexProperties, expandedProperties, complexListProperties);
     }
-    
-    // And complex properties into compact and complete classes
-    
-    for (Element element : complexProperties) {
-      String propertyName = getPropertyName(element);
-      Element propertyType = getPropertyType(element);
-      String idType = getIdTypeName(propertyType);
-      
-      if (idType != null) {
-        originalPropertiesCompact.add(propertyName);
-        ModelProperty property = compactClass.addProperty(idType, propertyName + "_id");
-        compactClass.addGetter(property);
-        compactClass.addSetter(property);
-      }
-    }
-
-    for (Element element : complexProperties) {
-      String propertyName = getPropertyName(element);
-      originalPropertiesComplete.add(propertyName);
-      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
-      ModelProperty property = completeClass.addProperty("TranquilModelEntity", propertyName);
-      completeClass.addGetter(property);
-      completeClass.addSetter(property);
-    }
-    
-    for (Element element : expandedProperties) {
-      String propertyName = getPropertyName(element) + "_tq";
-      originalPropertiesComplete.add(propertyName);
-      
-      TranquilityEntityField annotation = element.getAnnotation(TranquilityEntityField.class);
-      if (!StringUtils.isEmpty(annotation.fieldName()))
-        propertyName = annotation.fieldName();
-      
-      TypeMirror mirror = null;
-      
-      try { 
-        annotation.value();
-      } catch (MirroredTypeException mte) {
-        mirror = mte.getTypeMirror();
-      }
-      
-      Types TypeUtils = this.processingEnv.getTypeUtils();
-      TypeElement e = (TypeElement) TypeUtils.asElement(mirror);
-
-      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
-      completeClass.addImport(TranquilityExpandedField.class.getCanonicalName());
-
-      ModelProperty property;
-      if (isCollection(element.asType()))
-        property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
-      else
-        property = completeClass.addProperty("TranquilModelEntity", propertyName);
-      property.addAnnotation("@TranquilityExpandedField(entityResolverClass = " + e.getQualifiedName() + ".class, idProperty = \"" + getPropertyName(element) + "\")");
-      completeClass.addGetter(property);
-      completeClass.addSetter(property);
-    }
-
-    // Add complex list properties into compact and complete classes
-    
-    for (Element element : complexListProperties) {
-      String propertyName = getPropertyName(element);
-      DeclaredType listGenericType = (DeclaredType) getListGenericType((DeclaredType) getMethodReturnType(element));
-      String idType = getIdTypeName(listGenericType.asElement());
-      originalPropertiesCompact.add(propertyName);
-      ModelProperty property = compactClass.addProperty("java.util.List<" + idType + ">", propertyName + "_ids");
-      compactClass.addGetter(property);
-      compactClass.addSetter(property);
-    }
-
-    for (Element element : complexListProperties) {
-      String propertyName = getPropertyName(element);
-      originalPropertiesComplete.add(propertyName);
-      completeClass.addImport(TranquilModelEntity.class.getCanonicalName());
-      ModelProperty property = completeClass.addProperty("java.util.List<TranquilModelEntity>", propertyName);
-      completeClass.addGetter(property);
-      completeClass.addSetter(property);
-    }
-    
-    // Add classes into lookup properties
-    
-    String fullyQualifiedClassName = packageName + '.' + className;
-
-    baseClasses.put(fullyQualifiedClassName, baseClass.getFullyQualifiedName());
-    compactClasses.put(fullyQualifiedClassName, compactClass.getFullyQualifiedName());
-    completeClasses.put(fullyQualifiedClassName, completeClass.getFullyQualifiedName());
-    
-    // Add original properties field into tranquil class
-    
-    baseClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesBase) + "}");
-    compactClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesCompact) + "}");
-    completeClass.addProperty("public final static", "String[]", "properties", "{" + joinProperties(originalPropertiesComplete) + "}");
-    
-    // Write classes
-    
-    note("Writing class: " + baseClass.getFullyQualifiedName());
-    classWriter.writeClass(processingEnv.getFiler().createSourceFile(processingEnv.getElementUtils().getBinaryName(entity) + "Base"), baseClass);
-    
-    note("Writing class: " + compactClass.getFullyQualifiedName());
-    classWriter.writeClass(processingEnv.getFiler().createSourceFile(processingEnv.getElementUtils().getBinaryName(entity) + "Compact"), compactClass);
-
-    note("Writing class: " + completeClass.getFullyQualifiedName());
-    classWriter.writeClass(processingEnv.getFiler().createSourceFile(processingEnv.getElementUtils().getBinaryName(entity) + "Complete"), completeClass);
   }
 
-  private Element findField(List<? extends Element> elements, String name) {
+	private Element findField(List<? extends Element> elements, String name) {
   	for (Element element : elements) {
   		if (element.getKind() == ElementKind.FIELD) {
   		  if (element.getSimpleName().contentEquals(name)) {
@@ -614,9 +739,36 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
     return elementPackage.getQualifiedName().toString();
   }
 
+  private String getOption(String name) {
+		String value = processingEnv.getOptions().get(name);
+		if (StringUtils.isNotBlank(value)) {
+			return value;
+		}
+		
+		return DEFAULT_OPTIONS.get(name);
+	}
+
+  private boolean getBooleanOption(String name) {
+		return "true".equalsIgnoreCase(getOption(name));
+	}
+
   private int round = 0;
   private ClassWriter classWriter = new ClassWriter();
   private Map<String, String> baseClasses;
   private Map<String, String> compactClasses;
   private Map<String, String> completeClasses;
+  
+  private static final Map<String, String> DEFAULT_OPTIONS;
+  
+  static {
+  	DEFAULT_OPTIONS = new HashMap<String, String>();
+  	DEFAULT_OPTIONS.put("lookupPackage", "fi.tranquil");
+  	DEFAULT_OPTIONS.put("flatModel", "false");
+  	DEFAULT_OPTIONS.put("generateCompact", "true");
+  	DEFAULT_OPTIONS.put("generateComplete", "true");
+  	DEFAULT_OPTIONS.put("basePostfix", "Base");
+  	DEFAULT_OPTIONS.put("compactPostfix", "Compact");
+  	DEFAULT_OPTIONS.put("completePostfix", "Complete");
+  }
+  
 }
