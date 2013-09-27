@@ -77,17 +77,17 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         
         baseLookup.addInterface("fi.tranquil.processing.EntityLookup");
         baseLookup.addConstructor("public", constructLookupConstructor(baseClasses), null);
-        baseLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
+        baseLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", "new java.util.HashMap<Class<?>, Class<?>>()");
         baseLookup.addMethod(lookupFindMethod);
         
         compactLookup.addInterface("fi.tranquil.processing.EntityLookup");
         compactLookup.addConstructor("public", constructLookupConstructor(compactClasses), null);
-        compactLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
+        compactLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", "new java.util.HashMap<Class<?>, Class<?>>()");
         compactLookup.addMethod(lookupFindMethod);
         
         completeLookup.addInterface("fi.tranquil.processing.EntityLookup");
         completeLookup.addConstructor("public", constructLookupConstructor(completeClasses), null);
-        completeLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", " new java.util.HashMap<Class<?>, Class<?>>()");
+        completeLookup.addProperty("private", "java.util.Map<Class<?>, Class<?>>", "classes", "new java.util.HashMap<Class<?>, Class<?>>()");
         completeLookup.addMethod(lookupFindMethod);
         
         // Write lookup classes
@@ -95,9 +95,14 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
         if (!getBooleanOption("flatModel")) {
           classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".BaseLookup"), baseLookup);
         }
+
+        if (getBooleanOption("generateCompact")) {
+          classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompactLookup"), compactLookup);
+        }
         
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompactLookup"), compactLookup);
-        classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompleteLookup"), completeLookup);
+        if (getBooleanOption("generateComplete")) {
+          classWriter.writeClass(processingEnv.getFiler().createSourceFile(usePackage + ".CompleteLookup"), completeLookup);
+        }
       } catch (IOException e) {
         processingEnv.getMessager().printMessage(Kind.ERROR, e.getMessage());
       }
@@ -193,7 +198,7 @@ public class TranquilModelAnnotationProcessor extends AbstractProcessor {
 
     // Add tranquil annotations to classes
     
-    compactClass.addClassAnnotation(String.format("@TranquilModel  (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
+    compactClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPACT)", qualifiedName));
     completeClass.addClassAnnotation(String.format("@TranquilModel (entityClass = %s.class, entityType = TranquilModelType.COMPLETE)", qualifiedName));
     
     // Lists for original properties
